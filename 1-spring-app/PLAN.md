@@ -36,21 +36,30 @@ Generar un proyecto Spring Boot con las siguientes características:
 ├── src/
 │   ├── main/
 │   │   ├── java/com/jorge/course/antigravity/springboot/
-│   │   │   └── Application.java
+│   │   │   ├── Application.java
+│   │   │   ├── controllers/
+│   │   │   │   └── IndexController.java
+│   │   │   └── models/
+│   │   │       └── User.java
 │   │   └── resources/
 │   │       ├── application.properties
 │   │       ├── static/
 │   │       └── templates/
 │   └── test/
 │       └── java/com/jorge/course/antigravity/springboot/
-│           └── ApplicationTests.java
+│           ├── ApplicationTests.java
+│           └── controllers/
+│               └── IndexControllerTest.java
 ├── .gitattributes
 ├── .gitignore
 ├── HELP.md
 ├── mvnw
 ├── mvnw.cmd
 ├── pom.xml
-└── install.cmd (existente)
+├── PLAN.md
+└── AGENTS.md
+
+
 ```
 
 ---
@@ -131,8 +140,117 @@ public class Application {
 }
 ```
 
+#### [NEW] `src/main/java/com/jorge/course/antigravity/springboot/controllers/IndexController.java`
+Controlador REST básico en el paquete `controllers` con endpoint GET que retorna un mensaje `"hola mundo"`:
+```java
+package com.jorge.course.antigravity.springboot.controllers;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
+
+@RestController
+public class IndexController {
+
+    @GetMapping({"/", "/index", "/api/index"})
+    public ResponseEntity<Map<String, String>> index() {
+        return ResponseEntity.ok(Map.of("message", "hola mundo"));
+    }
+}
+```
+
+#### [NEW] `src/test/java/com/jorge/course/antigravity/springboot/controllers/IndexControllerTest.java`
+Pruebas unitarias con `@WebMvcTest` y `MockMvc` para validar el endpoint GET:
+```java
+package com.jorge.course.antigravity.springboot.controllers;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest(IndexController.class)
+class IndexControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Test
+    void shouldReturnHolaMundoMessage() throws Exception {
+        mockMvc.perform(get("/index"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("hola mundo"));
+    }
+
+    @Test
+    void shouldReturnHolaMundoOnRoot() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("hola mundo"));
+    }
+}
+```
+
+#### [NEW] `src/main/java/com/jorge/course/antigravity/springboot/models/User.java`
+Modelo de datos para encapsular los atributos del usuario (`name`, `lastname`, `email`) con constructores, getters y setters:
+```java
+package com.jorge.course.antigravity.springboot.models;
+
+public class User {
+
+    private String name;
+    private String lastname;
+    private String email;
+
+    public User() {
+    }
+
+    public User(String name, String lastname) {
+        this.name = name;
+        this.lastname = lastname;
+    }
+
+    public User(String name, String lastname, String email) {
+        this.name = name;
+        this.lastname = lastname;
+        this.email = email;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getLastname() {
+        return lastname;
+    }
+
+    public void setLastname(String lastname) {
+        this.lastname = lastname;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+}
+```
+
 #### [NEW] Maven Wrapper & Configuración
 - `mvnw`, `mvnw.cmd` y `.mvn/wrapper/maven-wrapper.properties` para garantizar compilación autónoma e independiente de la versión global de Maven.
+
 
 ---
 
@@ -141,10 +259,19 @@ public class Application {
 ### Pruebas Automatizadas
 1. **Validación de estructura:** Comprobar que todos los directorios (`src/main/java/...`, `src/main/resources/application.properties`) existen correctamente.
 2. **Validación de compilación:**
-   ```powershell
-   $env:JAVA_HOME="D:\HERRAMIENTAS_DESARROLLO\java64\jdk-21.0.10"
-   .\mvnw.cmd clean compile
+   ```cmd
+   cmd /c "set JAVA_HOME=D:\HERRAMIENTAS_DESARROLLO\java64\jdk-21.0.10&& set PATH=D:\HERRAMIENTAS_DESARROLLO\java64\jdk-21.0.10\bin;%PATH%&& mvnw.cmd clean compile"
+   ```
+3. **Validación de pruebas (unitarias y contexto):**
+   ```cmd
+   cmd /c "set JAVA_HOME=D:\HERRAMIENTAS_DESARROLLO\java64\jdk-21.0.10&& set PATH=D:\HERRAMIENTAS_DESARROLLO\java64\jdk-21.0.10\bin;%PATH%&& mvnw.cmd test"
    ```
 
 ### Verificación Manual
-- El usuario podrá abrir el proyecto en su IDE (IntelliJ, VS Code, Eclipse) y verificar que Maven importe todas las dependencias y reconozca la clase principal `Application.java`.
+- Acceder a `http://localhost:8080/index` o `http://localhost:8080/` y comprobar la respuesta JSON:
+  ```json
+  {
+    "message": "hola mundo"
+  }
+  ```
+
