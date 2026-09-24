@@ -214,6 +214,31 @@ public class IndexController {
                 .contentType(MediaType.APPLICATION_XML)
                 .body(user);
     }
+
+    // http://localhost:8080/api/headers
+    @GetMapping("/headers")
+    public ResponseEntity<Map<String, Object>> getHeaders(
+            @RequestHeader(name = "X-Required-Header", required = true) String requiredHeader,
+            @RequestHeader(name = "X-Optional-Header", required = false, defaultValue = "valor por defecto") String optionalHeader) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Headers recibidos en el request");
+        response.put("requiredHeader", requiredHeader);
+        response.put("optionalHeader", optionalHeader);
+        return ResponseEntity.ok(response);
+    }
+
+    // http://localhost:8080/api/saludo?name=Jorge
+    // http://localhost:8080/api/saludar?name=Jorge
+    // http://localhost:8080/api/greet?name=Jorge
+    // http://localhost:8080/api/param?name=Jorge
+    @GetMapping({ "/saludo", "/saludar", "/greet", "/param" })
+    public ResponseEntity<Map<String, Object>> greet(
+            @RequestParam(name = "name", required = false, defaultValue = "Mundo") String name) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Hola " + name);
+        response.put("name", name);
+        return ResponseEntity.ok(response);
+    }
 }
 ```
 
@@ -310,6 +335,49 @@ class IndexControllerTest {
                 .andExpect(xpath("/User/name").string("Jorge"))
                 .andExpect(xpath("/User/lastname").string("Doe"))
                 .andExpect(xpath("/User/email").string("[EMAIL_ADDRESS]"));
+    }
+
+    @Test
+    void shouldReturnHeadersWhenBothProvided() throws Exception {
+        mockMvc.perform(get("/api/headers")
+                .header("X-Required-Header", "token-vital")
+                .header("X-Optional-Header", "info-opcional"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Headers recibidos en el request"))
+                .andExpect(jsonPath("$.requiredHeader").value("token-vital"))
+                .andExpect(jsonPath("$.optionalHeader").value("info-opcional"));
+    }
+
+    @Test
+    void shouldReturnHeadersWhenOnlyRequiredProvided() throws Exception {
+        mockMvc.perform(get("/api/headers")
+                .header("X-Required-Header", "token-vital"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Headers recibidos en el request"))
+                .andExpect(jsonPath("$.requiredHeader").value("token-vital"))
+                .andExpect(jsonPath("$.optionalHeader").value("valor por defecto"));
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenRequiredHeaderMissing() throws Exception {
+        mockMvc.perform(get("/api/headers"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldGreetByNameWhenParamProvided() throws Exception {
+        mockMvc.perform(get("/api/saludo").param("name", "Jorge"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Hola Jorge"))
+                .andExpect(jsonPath("$.name").value("Jorge"));
+    }
+
+    @Test
+    void shouldGreetWithDefaultWhenParamNotProvided() throws Exception {
+        mockMvc.perform(get("/api/saludo"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Hola Mundo"))
+                .andExpect(jsonPath("$.name").value("Mundo"));
     }
 }
 ```
@@ -423,6 +491,62 @@ public class User {
     }
   }
   ```
+- Probar endpoint de cabeceras HTTP `http://localhost:8080/api/headers`:
+  - **Con ambos headers (requerido y opcional):**
+    ```bash
+    curl -H "X-Required-Header: token-vital" -H "X-Optional-Header: extra-info" http://localhost:8080/api/headers
+    ```
+    Respuesta esperada:
+    ```json
+    {
+      "message": "Headers recibidos en el request",
+      "requiredHeader": "token-vital",
+      "optionalHeader": "extra-info"
+    }
+    ```
+  - **Con solo el header requerido (opcional omitido):**
+    ```bash
+    curl -H "X-Required-Header: token-vital" http://localhost:8080/api/headers
+    ```
+    Respuesta esperada:
+    ```json
+    {
+      "message": "Headers recibidos en el request",
+      "requiredHeader": "token-vital",
+      "optionalHeader": null
+    }
+    ```
+  - **Sin el header requerido (retorna 400 Bad Request):**
+    ```bash
+    curl -i http://localhost:8080/api/headers
+    ```
+    Código HTTP esperado: `400 Bad Request` (`MissingRequestHeaderException`).
+- Probar endpoint de saludo con parámetro en Query String `http://localhost:8080/api/saludo`:
+  - **Con parámetro `name` suministrado (`?name=Jorge`):**
+    ```bash
+    curl "http://localhost:8080/api/saludo?name=Jorge"
+    ```
+    Respuesta esperada:
+    ```json
+    {
+      "name": "Jorge",
+      "message": "Hola Jorge"
+    }
+    ```
+  - **Sin parámetro `name` (usa el valor por defecto `"Mundo"`):**
+    ```bash
+    curl "http://localhost:8080/api/saludo"
+    ```
+    Respuesta esperada:
+    ```json
+    {
+      "name": "Mundo",
+      "message": "Hola Mundo"
+    }
+    ```
+  - Rutas equivalentes disponibles: `/api/saludo`, `/api/saludar`, `/api/greet`, `/api/param`.
+
+
 
 
 

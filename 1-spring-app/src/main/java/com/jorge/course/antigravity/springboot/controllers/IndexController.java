@@ -6,7 +6,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -71,7 +73,8 @@ public class IndexController {
     // http://localhost:8080/api/details-xml
     // http://localhost:8080/api/user-xml
     // http://localhost:8080/api/details (con cabecera Accept: application/xml)
-    @GetMapping(value = { "/details", "/user", "/details-xml", "/user-xml" }, produces = MediaType.APPLICATION_XML_VALUE)
+    @GetMapping(value = { "/details", "/user", "/details-xml",
+            "/user-xml" }, produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<User> userXml() {
         User user = new User("Jorge", "Doe", "[EMAIL_ADDRESS]");
         return ResponseEntity.status(HttpStatus.OK)
@@ -79,5 +82,32 @@ public class IndexController {
                 .body(user);
     }
 
-}
+    // http://localhost:8080/api/headers
+    @GetMapping("/headers")
+    public ResponseEntity<Map<String, Object>> getHeaders(
+            @RequestHeader(name = "X-Required-Header", required = true) String requiredHeader,
+            @RequestHeader(name = "X-Optional-Header", required = false, defaultValue = "valor por defecto") String optionalHeader) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Headers recibidos en el request");
+        response.put("requiredHeader", requiredHeader);
+        response.put("optionalHeader", optionalHeader);
+        return ResponseEntity.ok(response);
+    }
 
+    // http://localhost:8080/api/saludo?name=Jorge
+    // http://localhost:8080/api/saludar?name=Jorge
+    // http://localhost:8080/api/greet?name=Jorge
+    // http://localhost:8080/api/param?name=Jorge
+    // @RequestParam(required = false, defaultValue = "Mundo") String name) {
+    // @RequestParam String name) {
+    // @RequestParam(required = false) String name) {
+    @GetMapping({ "/saludo", "/saludar", "/greet", "/param" })
+    public ResponseEntity<Map<String, Object>> greet(
+            @RequestParam(name = "name", required = false, defaultValue = "Mundo") String name) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Hola " + name);
+        response.put("name", name);
+        return ResponseEntity.ok(response);
+    }
+
+}

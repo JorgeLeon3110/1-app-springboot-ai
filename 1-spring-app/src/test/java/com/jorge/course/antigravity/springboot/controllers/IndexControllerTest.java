@@ -90,4 +90,48 @@ class IndexControllerTest {
                 .andExpect(xpath("/User/email").string("[EMAIL_ADDRESS]"));
     }
 
+    @Test
+    void shouldReturnHeadersWhenBothProvided() throws Exception {
+        mockMvc.perform(get("/api/headers")
+                .header("X-Required-Header", "token-vital")
+                .header("X-Optional-Header", "info-opcional"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Headers recibidos en el request"))
+                .andExpect(jsonPath("$.requiredHeader").value("token-vital"))
+                .andExpect(jsonPath("$.optionalHeader").value("info-opcional"));
+    }
+
+    @Test
+    void shouldReturnHeadersWhenOnlyRequiredProvided() throws Exception {
+        mockMvc.perform(get("/api/headers")
+                .header("X-Required-Header", "token-vital"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Headers recibidos en el request"))
+                .andExpect(jsonPath("$.requiredHeader").value("token-vital"))
+                .andExpect(jsonPath("$.optionalHeader").value("valor por defecto"));
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenRequiredHeaderMissing() throws Exception {
+        mockMvc.perform(get("/api/headers"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldGreetByNameWhenParamProvided() throws Exception {
+        mockMvc.perform(get("/api/saludo").param("name", "Jorge"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Hola Jorge"))
+                .andExpect(jsonPath("$.name").value("Jorge"));
+    }
+
+    @Test
+    void shouldGreetWithDefaultWhenParamNotProvided() throws Exception {
+        mockMvc.perform(get("/api/saludo"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Hola Mundo"))
+                .andExpect(jsonPath("$.name").value("Mundo"));
+    }
+
 }
+
