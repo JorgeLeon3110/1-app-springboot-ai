@@ -99,6 +99,10 @@ Definición del build de Maven con Spring Boot 4.0.6, Java 21 y dependencias `we
 			<optional>true</optional>
 		</dependency>
 		<dependency>
+			<groupId>com.fasterxml.jackson.dataformat</groupId>
+			<artifactId>jackson-dataformat-xml</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
 			<scope>test</scope>
@@ -141,39 +145,94 @@ public class Application {
 ```
 
 #### [NEW] `src/main/java/com/jorge/course/antigravity/springboot/controllers/IndexController.java`
-Controlador REST básico en el paquete `controllers` con endpoint GET que retorna un mensaje `"hola mundo"`:
+Controlador REST en el paquete `controllers` con prefijo `/api` y endpoints para retornar mensajes y el modelo `User` con `ResponseEntity`:
 ```java
 package com.jorge.course.antigravity.springboot.controllers;
 
+import com.jorge.course.antigravity.springboot.models.User;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
+@RequestMapping("/api")
 public class IndexController {
 
-    @GetMapping({"/", "/index", "/api/index"})
-    public ResponseEntity<Map<String, String>> index() {
-        return ResponseEntity.ok(Map.of("message", "hola mundo"));
+    @GetMapping({ "/index" })
+    public ResponseEntity<Map<String, Object>> index() {
+        User user = new User("Jorge", "Doe", "jorge@correo.com");
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "hola mundo desde spring boot");
+        response.put("user", user);
+        return ResponseEntity.status(HttpStatus.OK).body(response);
+    }
+
+    @GetMapping({ "/greeting" })
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public Map<String, Object> index2() {
+        User user = new User("Jorge", "Doe", "jorge@correo.com");
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "hola mundo desde spring boot");
+        response.put("user", user);
+        return response;
+    }
+
+    // http://localhost:8080/api/details
+    // http://localhost:8080/api/user
+    @GetMapping(value = { "/details", "/user" }, produces = "application/json")
+    public ResponseEntity<User> user() {
+        User user = new User("Jorge", "Doe", "[EMAIL_ADDRESS]");
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .header("Content-Type", "application/json")
+                .header("X-Custom-Header", "mi header customizado")
+                .header("Authorization", "Bearer token_123456")
+                .body(user);
+    }
+
+    // http://localhost:8080/api/details-text
+    // http://localhost:8080/api/user-text
+    // http://localhost:8080/api/details (con header Accept: text/plain)
+    @GetMapping(value = { "/details", "/user", "/details-text", "/user-text" }, produces = "text/plain")
+    public ResponseEntity<String> userPlainText() {
+        User user = new User("Jorge", "Doe", "[EMAIL_ADDRESS]");
+        return ResponseEntity.ok(user.toString());
+    }
+
+    // http://localhost:8080/api/details-xml
+    // http://localhost:8080/api/user-xml
+    // http://localhost:8080/api/details (con cabecera Accept: application/xml)
+    @GetMapping(value = { "/details", "/user", "/details-xml", "/user-xml" }, produces = MediaType.APPLICATION_XML_VALUE)
+    public ResponseEntity<User> userXml() {
+        User user = new User("Jorge", "Doe", "[EMAIL_ADDRESS]");
+        return ResponseEntity.status(HttpStatus.OK)
+                .contentType(MediaType.APPLICATION_XML)
+                .body(user);
     }
 }
 ```
 
 #### [NEW] `src/test/java/com/jorge/course/antigravity/springboot/controllers/IndexControllerTest.java`
-Pruebas unitarias con `@WebMvcTest` y `MockMvc` para validar el endpoint GET:
+Pruebas unitarias con `@WebMvcTest` y `MockMvc` para validar todos los endpoints (JSON, texto plano y XML):
 ```java
 package com.jorge.course.antigravity.springboot.controllers;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.xpath;
 
 @WebMvcTest(IndexController.class)
 class IndexControllerTest {
@@ -182,20 +241,80 @@ class IndexControllerTest {
     private MockMvc mockMvc;
 
     @Test
-    void shouldReturnHolaMundoMessage() throws Exception {
-        mockMvc.perform(get("/index"))
+    void shouldReturnHolaMundoAndUserOnRoot() throws Exception {
+        mockMvc.perform(get("/api/index"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("hola mundo"));
+                .andExpect(jsonPath("$.message").value("hola mundo desde spring boot"))
+                .andExpect(jsonPath("$.user.name").value("Jorge"))
+                .andExpect(jsonPath("$.user.lastname").value("Doe"));
     }
 
     @Test
-    void shouldReturnHolaMundoOnRoot() throws Exception {
-        mockMvc.perform(get("/"))
+    void shouldReturnUserOnGreeting() throws Exception {
+        mockMvc.perform(get("/api/greeting"))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.message").value("hola mundo desde spring boot"))
+                .andExpect(jsonPath("$.user.name").value("Jorge"))
+                .andExpect(jsonPath("$.user.lastname").value("Doe"));
+    }
+
+    @Test
+    void shouldReturnUserDetails() throws Exception {
+        mockMvc.perform(get("/api/details").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.name").value("Jorge"))
+                .andExpect(jsonPath("$.lastname").value("Doe"))
+                .andExpect(jsonPath("$.email").value("[EMAIL_ADDRESS]"));
+    }
+
+    @Test
+    void shouldReturnUserEndpoint() throws Exception {
+        mockMvc.perform(get("/api/user").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.name").value("Jorge"))
+                .andExpect(jsonPath("$.lastname").value("Doe"))
+                .andExpect(jsonPath("$.email").value("[EMAIL_ADDRESS]"));
+    }
+
+    @Test
+    void shouldReturnUserAsPlainTextWithAcceptHeader() throws Exception {
+        mockMvc.perform(get("/api/details").accept(MediaType.TEXT_PLAIN))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("hola mundo"));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_PLAIN))
+                .andExpect(content().string("User [name=Jorge, lastname=Doe, email=[EMAIL_ADDRESS]]"));
+    }
+
+    @Test
+    void shouldReturnUserAsPlainTextOnTextEndpoint() throws Exception {
+        mockMvc.perform(get("/api/user-text"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_PLAIN))
+                .andExpect(content().string("User [name=Jorge, lastname=Doe, email=[EMAIL_ADDRESS]]"));
+    }
+
+    @Test
+    void shouldReturnUserAsXmlOnXmlEndpoint() throws Exception {
+        mockMvc.perform(get("/api/user-xml"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_XML))
+                .andExpect(xpath("/User/name").string("Jorge"))
+                .andExpect(xpath("/User/lastname").string("Doe"))
+                .andExpect(xpath("/User/email").string("[EMAIL_ADDRESS]"));
+    }
+
+    @Test
+    void shouldReturnUserAsXmlWithAcceptHeader() throws Exception {
+        mockMvc.perform(get("/api/details").accept(MediaType.APPLICATION_XML))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_XML))
+                .andExpect(xpath("/User/name").string("Jorge"))
+                .andExpect(xpath("/User/lastname").string("Doe"))
+                .andExpect(xpath("/User/email").string("[EMAIL_ADDRESS]"));
     }
 }
 ```
+
+
 
 #### [NEW] `src/main/java/com/jorge/course/antigravity/springboot/models/User.java`
 Modelo de datos para encapsular los atributos del usuario (`name`, `lastname`, `email`) con constructores, getters y setters:
@@ -245,6 +364,11 @@ public class User {
     public void setEmail(String email) {
         this.email = email;
     }
+
+    @Override
+    public String toString() {
+        return "User [name=" + name + ", lastname=" + lastname + ", email=" + email + "]";
+    }
 }
 ```
 
@@ -268,10 +392,38 @@ public class User {
    ```
 
 ### Verificación Manual
-- Acceder a `http://localhost:8080/index` o `http://localhost:8080/` y comprobar la respuesta JSON:
+- Acceder a `http://localhost:8080/api/details-xml` o `http://localhost:8080/api/user-xml` (o con cabecera `Accept: application/xml`) y comprobar la respuesta XML:
+  ```xml
+  <User>
+    <name>Jorge</name>
+    <lastname>Doe</lastname>
+    <email>[EMAIL_ADDRESS]</email>
+  </User>
+  ```
+- Acceder a `http://localhost:8080/api/details-text` o `http://localhost:8080/api/user-text` (o con cabecera `Accept: text/plain`) y comprobar la respuesta en texto plano:
+  ```text
+  User [name=Jorge, lastname=Doe, email=[EMAIL_ADDRESS]]
+  ```
+- Acceder a `http://localhost:8080/api/details` o `http://localhost:8080/api/user` (con cabecera `Accept: application/json`) y comprobar la respuesta JSON:
   ```json
   {
-    "message": "hola mundo"
+    "name": "Jorge",
+    "lastname": "Doe",
+    "email": "[EMAIL_ADDRESS]"
   }
   ```
+- Acceder a `http://localhost:8080/api/index` para comprobar la respuesta compuesta:
+  ```json
+  {
+    "message": "hola mundo desde spring boot",
+    "user": {
+      "name": "Jorge",
+      "lastname": "Doe",
+      "email": "[EMAIL_ADDRESS]"
+    }
+  }
+  ```
+
+
+
 
